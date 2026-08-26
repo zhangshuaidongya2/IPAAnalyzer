@@ -92,6 +92,10 @@ You can also right-click an `.ipa` file in Finder and select `IPA Analyzer` from
 - The application does not decrypt, modify, re-sign, or install IPA files.
 - Damaged, encrypted, or unsafe archives are rejected or processed with strict limits.
 
+## License
+
+This project is licensed under the [MIT License](LICENSE).
+
 ## Feedback
 
 To report a problem or suggest a feature, open a GitHub Issue and include your macOS version, IPA Analyzer version, and a description of the problem. Do not upload IPA files containing sensitive information or unreleased application data.
