@@ -1,5 +1,7 @@
 # IPA Analyzer
 
+[简体中文](README.md) | [English](README_EN.md)
+
 IPA Analyzer 是一款用于查看和分析 IPA 文件的 macOS 桌面工具。所有分析均在本机完成，应用只读取 IPA 内容，不会运行其中的程序、动态库或脚本。
 
 ## 主要功能
