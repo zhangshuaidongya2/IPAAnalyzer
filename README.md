@@ -1,30 +1,30 @@
 # IPA Analyzer
 
-[简体中文](README.md) | [English](README_EN.md)
+[English](README.md) | [简体中文](README_zh-CN.md)
 
-IPA Analyzer 是一款用于查看和分析 IPA 文件的 macOS 桌面工具。所有分析均在本机完成，应用只读取 IPA 内容，不会运行其中的程序、动态库或脚本。
+IPA Analyzer is a macOS desktop application for inspecting and analyzing IPA files. All analysis is performed locally. The application only reads IPA contents and never executes bundled applications, dynamic libraries, or scripts.
 
-## 主要功能
+## Features
 
-- 查看应用名称、版本、Bundle ID、图标和文件大小
-- 查看签名类型、证书、描述文件和 Entitlements
-- 查看支持的设备架构、最低系统版本、SDK 和动态库
-- 汇总隐私权限、URL Scheme 和 Associated Domains
-- 查看 Framework、Extension、Watch App 和 App Clip
-- 浏览 IPA 完整文件结构、大小与哈希信息
-- 提供摘要与原始数据视图、搜索、复制和文件预览
+- View the application name, version, Bundle ID, icon, and file size
+- Inspect the signing type, certificates, provisioning profile, and entitlements
+- View supported architectures, minimum OS version, SDK, and dynamic libraries
+- Review privacy permissions, URL schemes, and associated domains
+- Inspect frameworks, extensions, Watch apps, and App Clips
+- Browse the complete IPA file tree, sizes, and hashes
+- Use summary and raw-data views with search, copy, and file preview support
 
-## 从源码运行
+## Running from Source
 
-适合希望查看源码、参与开发或使用命令行分析的用户。
+This option is intended for users who want to inspect the source code, contribute to development, or use the command-line analyzer.
 
-开发环境要求：
+Development requirements:
 
-- macOS 13 或更高版本
-- Python 3.11 或更高版本
-- macOS 系统工具：`security`、`codesign`、`file`、`lipo`、`otool`、`openssl`
+- macOS 13 or later
+- Python 3.11 or later
+- macOS system tools: `security`, `codesign`, `file`, `lipo`, `otool`, and `openssl`
 
-克隆项目并安装依赖：
+Clone the repository and install the dependencies:
 
 ```bash
 git clone https://github.com/zhangshuaidongya2/IPAAnalyzer.git
@@ -34,64 +34,64 @@ source .venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
-启动 GUI：
+Launch the GUI:
 
 ```bash
 python main.py --gui
 ```
 
-也可以在启动时直接打开一个 IPA：
+You can also open an IPA when launching the GUI:
 
 ```bash
 python main.py /path/to/Test.ipa --gui
 ```
 
-使用命令行分析：
+Analyze an IPA from the command line:
 
 ```bash
 python main.py /path/to/Test.ipa
 ```
 
-同时输出完整 JSON 报告：
+Write the complete JSON report to a file:
 
 ```bash
 python main.py /path/to/Test.ipa --json report.json
 ```
 
-运行测试：
+Run the tests:
 
 ```bash
 python -m unittest discover -v
 ```
 
-源码运行不需要 Developer ID 证书。完成首次安装后，后续只需激活 `.venv` 即可运行。
+Running from source does not require a Developer ID certificate. After the initial setup, activate `.venv` whenever you want to run the project again.
 
-## 下载与安装
+## Download and Installation
 
-需要 macOS 13 或更高版本。请从 GitHub Releases 按 Mac 芯片下载对应安装包：
+IPA Analyzer requires macOS 13 or later. Download the package for your Mac from GitHub Releases:
 
-- Apple Silicon（M1、M2、M3、M4 等）：`IPA-Analyzer-*-macOS-arm64.dmg`
-- Intel Mac：`IPA-Analyzer-*-macOS-x86_64.dmg`
+- Apple Silicon (M1, M2, M3, M4, and later): `IPA-Analyzer-*-macOS-arm64.dmg`
+- Intel Mac: `IPA-Analyzer-*-macOS-x86_64.dmg`
 
-打开下载的 DMG，将 `IPA Analyzer.app` 拖入“应用程序”文件夹，然后双击启动。Release 安装包已使用 Apple Developer ID 签名并经过 Apple 公证。
+Open the downloaded DMG, drag `IPA Analyzer.app` into the Applications folder, and then launch it. Release packages are signed with an Apple Developer ID and notarized by Apple.
 
-## 使用方法
+## Usage
 
-1. 启动 `IPA Analyzer`。
-2. 点击 `Open IPA` 选择文件，或直接把 `.ipa` 文件拖入窗口。
-3. 在摘要页面查看主要信息，在其他页面查看签名、权限、组件、文件和原始数据。
-4. 需要分析其他文件时，重新打开或拖入新的 IPA 即可。
+1. Launch `IPA Analyzer`.
+2. Click `Open IPA` to select a file, or drag an `.ipa` file into the window.
+3. Review key information on the summary page, then use the other pages to inspect signing, permissions, components, files, and raw data.
+4. Open or drag another IPA whenever you want to analyze a different file.
 
-也可以在 Finder 中右键 `.ipa` 文件，选择“打开方式”中的 `IPA Analyzer`。
+You can also right-click an `.ipa` file in Finder and select `IPA Analyzer` from the Open With menu.
 
-## 安全与隐私
+## Security and Privacy
 
-- IPA 分析完全在本机进行，不会上传文件或分析结果。
-- 不会执行 IPA 中的二进制、动态库或脚本。
-- 临时解压内容会在分析结束后自动清理。
-- 不提供解密、修改、重签名或安装 IPA 的功能。
-- 对损坏、加密或包含危险路径的压缩包会拒绝或限制处理。
+- IPA files are analyzed entirely on your Mac and are never uploaded.
+- The application never executes binaries, dynamic libraries, or scripts from an IPA.
+- Temporary extracted files are removed automatically after analysis.
+- The application does not decrypt, modify, re-sign, or install IPA files.
+- Damaged, encrypted, or unsafe archives are rejected or processed with strict limits.
 
-## 反馈
+## Feedback
 
-遇到问题或有功能建议，可以通过 GitHub Issues 提交，并附上 macOS 版本、应用版本和问题现象。请不要上传包含敏感信息或未公开应用数据的 IPA 文件。
+To report a problem or suggest a feature, open a GitHub Issue and include your macOS version, IPA Analyzer version, and a description of the problem. Do not upload IPA files containing sensitive information or unreleased application data.
