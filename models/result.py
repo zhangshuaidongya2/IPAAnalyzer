@@ -39,6 +39,7 @@ class IPAAnalysisResult:
     extensions: list[dict[str, Any]] = field(default_factory=list)
     embedded_bundles: list[dict[str, Any]] = field(default_factory=list)
     url_schemes: dict[str, list[str]] = field(default_factory=dict)
+    itunes_metadata: dict[str, Any] = field(default_factory=dict)
     files: list[dict[str, Any]] = field(default_factory=list)
     hashes: dict[str, str] = field(default_factory=dict)
     size_info: dict[str, int] = field(default_factory=dict)

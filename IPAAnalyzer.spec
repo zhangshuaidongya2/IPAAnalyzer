@@ -19,7 +19,7 @@ a = Analysis(
     [str(PROJECT_ROOT / "gui_main.py")],
     pathex=[str(PROJECT_ROOT)],
     binaries=[],
-    datas=[],
+    datas=[(str(PROJECT_ROOT / "assets" / "AppIcon-1024.png"), "assets")],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

@@ -2,14 +2,16 @@ from __future__ import annotations
 
 import json
 import plistlib
+import sys
 import zipfile
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QObject, QThread, QTimer, Qt, Signal, Slot
-from PySide6.QtGui import QAction, QCloseEvent
+from PySide6.QtCore import QEvent, QObject, QSize, QThread, QTimer, Qt, Signal, Slot
+from PySide6.QtGui import QAction, QCloseEvent, QColor, QIcon, QKeySequence, QPixmap
 from PySide6.QtWidgets import (
     QFileDialog,
+    QFrame,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -18,12 +20,11 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QProgressBar,
+    QPushButton,
     QSplitter,
     QStackedWidget,
-    QStyle,
     QTabWidget,
     QTableWidgetItem,
-    QToolBar,
     QTreeWidgetItem,
     QVBoxLayout,
     QWidget,
@@ -34,6 +35,22 @@ from analyzer.utils import format_bytes
 from models import IPAAnalysisResult, to_json_compatible
 
 from .widgets.data_views import CopyableTable, CopyableTree, ObjectTree, SearchableText
+
+
+def _resource_path(relative_path: str) -> Path:
+    project_root = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[1]))
+    return project_root / relative_path
+
+
+APP_ICON_PATH = _resource_path("assets/AppIcon-1024.png")
+
+
+def _mix_color(background: QColor, foreground: QColor, amount: float) -> QColor:
+    return QColor(
+        round(background.red() + (foreground.red() - background.red()) * amount),
+        round(background.green() + (foreground.green() - background.green()) * amount),
+        round(background.blue() + (foreground.blue() - background.blue()) * amount),
+    )
 
 
 def _display(value: Any) -> str:
@@ -118,6 +135,55 @@ class OverviewPage(QWidget):
         )
         self.info.set_data(result.raw.get("info_plist", {}))
         self.warnings.set_text("\n".join(result.errors) if result.errors else "No warnings.")
+
+
+class ITunesMetadataPage(QWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        self.summary = CopyableTable(["Field", "Value"])
+        self.all_fields = ObjectTree()
+        self.xml = SearchableText()
+        tabs = QTabWidget()
+        tabs.addTab(self.summary, "Summary")
+        tabs.addTab(self.all_fields, "All Fields")
+        tabs.addTab(self.xml, "XML")
+        layout = QVBoxLayout(self)
+        layout.addWidget(tabs)
+
+    def set_result(self, result: IPAAnalysisResult) -> None:
+        metadata = result.itunes_metadata
+        _fill_key_value_table(
+            self.summary,
+            [
+                ("Present", bool(metadata)),
+                ("Item Name", metadata.get("itemName")),
+                ("Bundle Display Name", metadata.get("bundleDisplayName")),
+                ("Bundle ID", metadata.get("softwareVersionBundleId")),
+                ("Version", metadata.get("bundleShortVersionString")),
+                ("Build", metadata.get("bundleVersion")),
+                ("Store Item ID", metadata.get("itemId")),
+                ("Artist", metadata.get("artistName")),
+                ("Artist ID", metadata.get("artistId")),
+                ("Store Account", metadata.get("appleId") or metadata.get("userName")),
+                ("Purchase Date", metadata.get("purchaseDate")),
+                ("Release Date", metadata.get("releaseDate")),
+                ("Genre", metadata.get("genre")),
+                ("Genre ID", metadata.get("genreId")),
+                ("Kind", metadata.get("kind")),
+                ("Rating", metadata.get("rating")),
+                ("Copyright", metadata.get("copyright")),
+                ("DRM Version", metadata.get("drmVersionNumber")),
+                ("Vendor ID", metadata.get("vendorId")),
+                ("Game Center", metadata.get("gameCenterEnabled")),
+                ("Supported Device IDs", metadata.get("softwareSupportedDeviceIds")),
+                ("File Name", metadata.get("fileName")),
+            ],
+        )
+        self.all_fields.set_data(metadata)
+        self.xml.set_text(
+            result.raw.get("itunes_metadata_xml")
+            or "iTunesMetadata.plist is not present in this IPA."
+        )
 
 
 class SigningPage(QWidget):
@@ -475,6 +541,179 @@ class RawPage(QWidget):
         self.text.set_json(result.raw)
 
 
+class EmptyState(QWidget):
+    open_requested = Signal()
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.setObjectName("emptyState")
+        self.setProperty("dragActive", False)
+        self._updating_palette = False
+
+        icon = QLabel()
+        icon.setObjectName("emptyIcon")
+        icon.setFixedSize(96, 96)
+        icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        pixmap = QPixmap(str(APP_ICON_PATH))
+        if not pixmap.isNull():
+            icon.setPixmap(
+                pixmap.scaled(
+                    QSize(88, 88),
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                )
+            )
+
+        self.title = QLabel("Open an IPA to begin")
+        self.title.setObjectName("emptyTitle")
+        self.title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.subtitle = QLabel(
+            "Inspect signing, permissions, frameworks, and package contents."
+        )
+        self.subtitle.setObjectName("emptySubtitle")
+        self.subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.subtitle.setWordWrap(True)
+
+        self.open_button = QPushButton("Choose IPA File...")
+        self.open_button.setObjectName("openIpaButton")
+        self.open_button.setDefault(True)
+        self.open_button.clicked.connect(self.open_requested)
+
+        self.hint = QLabel("or drag and drop an .ipa file here")
+        self.hint.setObjectName("emptyHint")
+        self.hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.hint.setWordWrap(True)
+
+        self.drop_panel = QFrame()
+        self.drop_panel.setObjectName("dropPanel")
+        self.drop_panel.setProperty("dragActive", False)
+        self.drop_panel.setMinimumSize(520, 360)
+        self.drop_panel.setMaximumSize(620, 400)
+
+        content = QVBoxLayout(self.drop_panel)
+        content.setContentsMargins(48, 36, 48, 36)
+        content.setSpacing(0)
+        content.addWidget(icon, 0, Qt.AlignmentFlag.AlignCenter)
+        content.addSpacing(14)
+        content.addWidget(self.title)
+        content.addSpacing(8)
+        content.addWidget(self.subtitle)
+        content.addSpacing(26)
+        content.addWidget(self.open_button, 0, Qt.AlignmentFlag.AlignCenter)
+        content.addSpacing(14)
+        content.addWidget(self.hint)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(48, 48, 48, 48)
+        layout.addWidget(self.drop_panel, 0, Qt.AlignmentFlag.AlignCenter)
+        self._apply_palette()
+
+    def _apply_palette(self) -> None:
+        if self._updating_palette:
+            return
+        self._updating_palette = True
+        palette = self.palette()
+        window = palette.window().color()
+        base = palette.base().color()
+        text = palette.windowText().color()
+        highlight = palette.highlight().color()
+        highlighted_text = palette.highlightedText().color()
+        panel = _mix_color(window, base, 0.42)
+        border = _mix_color(panel, text, 0.16)
+        secondary = _mix_color(panel, text, 0.66)
+        drag_background = _mix_color(panel, highlight, 0.10)
+        disabled_background = _mix_color(panel, text, 0.14)
+        disabled_text = _mix_color(panel, text, 0.46)
+
+        try:
+            self.setStyleSheet(
+                f"""
+            QWidget#emptyState {{
+                background-color: {window.name()};
+            }}
+            QFrame#dropPanel {{
+                background-color: {panel.name()};
+                border: 1px solid {border.name()};
+                border-radius: 8px;
+            }}
+            QFrame#dropPanel[dragActive="true"] {{
+                background-color: {drag_background.name()};
+                border: 2px solid {highlight.name()};
+            }}
+            QLabel {{
+                border: none;
+                background: transparent;
+                color: {text.name()};
+                letter-spacing: 0;
+            }}
+            QLabel#emptyTitle {{
+                font-size: 21px;
+                font-weight: 600;
+            }}
+            QLabel#emptySubtitle, QLabel#emptyHint {{
+                color: {secondary.name()};
+                font-size: 14px;
+            }}
+            QPushButton#openIpaButton {{
+                color: {highlighted_text.name()};
+                background-color: {highlight.name()};
+                border: 1px solid {highlight.name()};
+                border-radius: 6px;
+                min-width: 210px;
+                min-height: 42px;
+                padding: 0 20px;
+                font-size: 14px;
+                font-weight: 600;
+                letter-spacing: 0;
+            }}
+            QPushButton#openIpaButton:hover {{
+                background-color: {highlight.lighter(112).name()};
+                border-color: {highlight.lighter(112).name()};
+            }}
+            QPushButton#openIpaButton:pressed {{
+                background-color: {highlight.darker(112).name()};
+                border-color: {highlight.darker(112).name()};
+            }}
+            QPushButton#openIpaButton:disabled {{
+                color: {disabled_text.name()};
+                background-color: {disabled_background.name()};
+                border-color: {border.name()};
+            }}
+                """
+            )
+        finally:
+            self._updating_palette = False
+
+    def changeEvent(self, event: QEvent) -> None:
+        super().changeEvent(event)
+        if event.type() in (QEvent.Type.PaletteChange, QEvent.Type.ApplicationPaletteChange):
+            self._apply_palette()
+
+    def set_drag_active(self, active: bool) -> None:
+        if self.property("dragActive") == active:
+            return
+        self.setProperty("dragActive", active)
+        self.drop_panel.setProperty("dragActive", active)
+        self.drop_panel.style().unpolish(self.drop_panel)
+        self.drop_panel.style().polish(self.drop_panel)
+        self.drop_panel.update()
+
+    def set_loading(self, file_name: str | None) -> None:
+        loading = file_name is not None
+        self.title.setText("Analyzing IPA..." if loading else "Open an IPA to begin")
+        self.subtitle.setText(
+            file_name
+            if loading
+            else "Inspect signing, permissions, frameworks, and package contents."
+        )
+        self.open_button.setText("Analyzing..." if loading else "Choose IPA File...")
+        self.open_button.setEnabled(not loading)
+        self.hint.setText(
+            "Reading package metadata..." if loading else "or drag and drop an .ipa file here"
+        )
+
+
 class MainWindow(QMainWindow):
     def __init__(self, initial_path: str | None = None) -> None:
         super().__init__()
@@ -486,24 +725,27 @@ class MainWindow(QMainWindow):
         self._worker: AnalysisWorker | None = None
         self._closing = False
         self._pending_path: str | None = None
+        self._has_result = False
 
-        toolbar = QToolBar("Main")
-        toolbar.setMovable(False)
-        self.addToolBar(toolbar)
-        self.open_action = QAction(
-            self.style().standardIcon(QStyle.StandardPixmap.SP_DialogOpenButton),
-            "Open IPA",
-            self,
-        )
-        self.open_action.setShortcut("Ctrl+O")
+        app_icon = QIcon(str(APP_ICON_PATH))
+        if not app_icon.isNull():
+            self.setWindowIcon(app_icon)
+
+        self.open_action = QAction("Open IPA...", self)
+        self.open_action.setShortcut(QKeySequence.StandardKey.Open)
+        self.open_action.setToolTip("Open IPA")
         self.open_action.triggered.connect(self.open_ipa)
-        toolbar.addAction(self.open_action)
+        file_menu = self.menuBar().addMenu("&File")
+        file_menu.addAction(self.open_action)
+
+        self.empty_state = EmptyState()
+        self.empty_state.open_requested.connect(self.open_ipa)
 
         self.navigation = QListWidget()
-        self.navigation.setFixedWidth(185)
         self.stack = QStackedWidget()
         self.pages: list[tuple[str, QWidget]] = [
             ("Overview", OverviewPage()),
+            ("iTunes Metadata", ITunesMetadataPage()),
             ("Signing", SigningPage()),
             ("Entitlements", EntitlementsPage()),
             ("Permissions", PermissionsPage()),
@@ -520,12 +762,32 @@ class MainWindow(QMainWindow):
         self.navigation.currentRowChanged.connect(self.stack.setCurrentIndex)
         self.navigation.setCurrentRow(0)
 
-        central = QWidget()
-        layout = QHBoxLayout(central)
+        self.open_another_button = QPushButton("Open Another IPA...")
+        self.open_another_button.setMinimumHeight(34)
+        self.open_another_button.clicked.connect(self.open_action.trigger)
+        self.open_action.changed.connect(
+            lambda: self.open_another_button.setEnabled(self.open_action.isEnabled())
+        )
+
+        self.sidebar = QWidget()
+        self.sidebar.setFixedWidth(200)
+        sidebar_layout = QVBoxLayout(self.sidebar)
+        sidebar_layout.setContentsMargins(8, 8, 8, 10)
+        sidebar_layout.setSpacing(8)
+        sidebar_layout.addWidget(self.navigation, 1)
+        sidebar_layout.addWidget(self.open_another_button)
+
+        self.analysis_view = QWidget()
+        layout = QHBoxLayout(self.analysis_view)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.navigation)
+        layout.addWidget(self.sidebar)
         layout.addWidget(self.stack, 1)
-        self.setCentralWidget(central)
+
+        self.content_stack = QStackedWidget()
+        self.content_stack.addWidget(self.empty_state)
+        self.content_stack.addWidget(self.analysis_view)
+        self.content_stack.setCurrentWidget(self.empty_state)
+        self.setCentralWidget(self.content_stack)
 
         self.progress = QProgressBar()
         self.progress.setRange(0, 0)
@@ -533,6 +795,7 @@ class MainWindow(QMainWindow):
         self.progress.hide()
         self.statusBar().addPermanentWidget(self.progress)
         self.statusBar().showMessage("No IPA loaded")
+        self.statusBar().setVisible(False)
 
         if initial_path:
             QTimer.singleShot(0, lambda: self.load_ipa(initial_path))
@@ -549,6 +812,11 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(f"Queued {Path(path).name}")
             return
         self.open_action.setEnabled(False)
+        self.empty_state.set_drag_active(False)
+        if not self._has_result:
+            self.empty_state.set_loading(Path(path).name)
+            self.content_stack.setCurrentWidget(self.empty_state)
+        self.statusBar().setVisible(True)
         self.progress.show()
         self.statusBar().showMessage(f"Analyzing {Path(path).name}...")
 
@@ -576,12 +844,20 @@ class MainWindow(QMainWindow):
         app_name = result.basic.get("display_name") or result.basic.get("name") or Path(result.ipa_path).name
         warning_text = f"; {len(result.errors)} warning(s)" if result.errors else ""
         self.setWindowTitle(f"{app_name} - IPA Analyzer")
+        self._has_result = True
+        self.empty_state.set_loading(None)
+        self.content_stack.setCurrentWidget(self.analysis_view)
+        self.statusBar().setVisible(True)
         self.statusBar().showMessage(f"Analysis complete{warning_text}")
         self.progress.hide()
         self.open_action.setEnabled(True)
 
     @Slot(str)
     def _analysis_failed(self, message: str) -> None:
+        self.empty_state.set_loading(None)
+        if not self._has_result:
+            self.content_stack.setCurrentWidget(self.empty_state)
+            self.statusBar().setVisible(False)
         self.statusBar().showMessage("Analysis failed")
         self.progress.hide()
         self.open_action.setEnabled(True)
@@ -603,15 +879,24 @@ class MainWindow(QMainWindow):
     def dragEnterEvent(self, event) -> None:  # type: ignore[no-untyped-def]
         urls = event.mimeData().urls() if event.mimeData().hasUrls() else []
         if any(url.isLocalFile() and url.toLocalFile().lower().endswith(".ipa") for url in urls):
+            self.empty_state.set_drag_active(True)
             event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragLeaveEvent(self, event) -> None:  # type: ignore[no-untyped-def]
+        self.empty_state.set_drag_active(False)
+        event.accept()
 
     def dropEvent(self, event) -> None:  # type: ignore[no-untyped-def]
+        self.empty_state.set_drag_active(False)
         for url in event.mimeData().urls():
             path = url.toLocalFile()
             if url.isLocalFile() and path.lower().endswith(".ipa"):
                 self.load_ipa(path)
                 event.acceptProposedAction()
                 return
+        event.ignore()
 
     def closeEvent(self, event: QCloseEvent) -> None:
         if self._thread and self._thread.isRunning():

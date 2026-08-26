@@ -4,6 +4,16 @@
 
 IPA Analyzer 是一款用于查看和分析 IPA 文件的 macOS 桌面工具。所有分析均在本机完成，应用只读取 IPA 内容，不会运行其中的程序、动态库或脚本。
 
+## 界面截图
+
+<p align="center">
+  <img src="docs/screenshots/open-ipa.png" alt="打开 IPA" width="760">
+</p>
+<p align="center">
+  <img src="docs/screenshots/overview.png" alt="IPA 分析概览" width="49%">
+  <img src="docs/screenshots/itunes-metadata.png" alt="iTunes 元数据" width="49%">
+</p>
+
 ## 主要功能
 
 - 查看应用名称、版本、Bundle ID、图标和文件大小
@@ -11,6 +21,7 @@ IPA Analyzer 是一款用于查看和分析 IPA 文件的 macOS 桌面工具。�
 - 查看支持的设备架构、最低系统版本、SDK 和动态库
 - 汇总隐私权限、URL Scheme 和 Associated Domains
 - 查看 Framework、Extension、Watch App 和 App Clip
+- 当 IPA 包含 `iTunesMetadata.plist` 时查看 iTunes 商店元数据
 - 浏览 IPA 完整文件结构、大小与哈希信息
 - 提供摘要与原始数据视图、搜索、复制和文件预览
 

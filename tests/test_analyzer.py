@@ -40,7 +40,24 @@ class IPAAnalyzerTests(unittest.TestCase):
             "CFBundleShortVersionString": "2.0",
             "CFBundleExecutable": "SampleKit",
         }
+        itunes_metadata = {
+            "itemName": "Example Store App",
+            "artistName": "Example Developer",
+            "itemId": 123456789,
+            "appleId": "buyer@example.com",
+            "softwareVersionBundleId": "com.example.app",
+            "bundleShortVersionString": "1.2.3",
+            "bundleVersion": "42",
+            "purchaseDate": "2026-08-26T10:00:00Z",
+            "genre": "Utilities",
+            "drmVersionNumber": 0,
+            "softwareSupportedDeviceIds": [1, 2],
+        }
         with zipfile.ZipFile(ipa, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr(
+                "iTunesMetadata.plist",
+                plistlib.dumps(itunes_metadata, fmt=plistlib.FMT_BINARY),
+            )
             archive.writestr(
                 "Payload/Example.app/Info.plist",
                 plistlib.dumps(info, fmt=plistlib.FMT_BINARY),
@@ -74,12 +91,16 @@ class IPAAnalyzerTests(unittest.TestCase):
         self.assertEqual(result.frameworks[0]["name"], "SampleKit.framework")
         self.assertEqual(result.extensions[0]["type"], "Share Extension")
         self.assertEqual(result.url_schemes["registered"], ["example"])
+        self.assertEqual(result.itunes_metadata["itemName"], "Example Store App")
+        self.assertEqual(result.itunes_metadata["itemId"], 123456789)
         camera = next(item for item in result.permissions if item["permission"] == "Camera")
         self.assertTrue(camera["declared"])
         self.assertGreater(result.size_info["uncompressed_size"], 0)
         self.assertEqual(len(result.hashes["ipa_sha256"]), 64)
         self.assertTrue(any(item["relative_path"].endswith("Info.plist") for item in result.files))
         self.assertIn("mobileprovision_source", result.raw)
+        self.assertIn("itunes_metadata_source", result.raw)
+        self.assertIn("itunes_metadata_xml", result.raw)
         self.assertIn("frameworks", result.raw)
         parsed_json = json.loads(result.to_json())
         self.assertEqual(parsed_json["basic"]["display_name"], "Example App")
@@ -109,6 +130,29 @@ class IPAAnalyzerTests(unittest.TestCase):
         self.assertEqual(result.frameworks, [])
         self.assertEqual(result.extensions, [])
         self.assertEqual(result.embedded_bundles, [])
+        self.assertEqual(result.itunes_metadata, {})
+
+    def test_invalid_itunes_metadata_is_reported_without_failing(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            ipa = Path(temporary) / "invalid-metadata.ipa"
+            info = {
+                "CFBundleName": "Example",
+                "CFBundleIdentifier": "com.example.app",
+                "CFBundleExecutable": "Example",
+                "CFBundlePackageType": "APPL",
+            }
+            with zipfile.ZipFile(ipa, "w") as archive:
+                archive.writestr("iTunesMetadata.plist", b"not-a-plist")
+                archive.writestr("Payload/Example.app/Info.plist", plistlib.dumps(info))
+                archive.writestr("Payload/Example.app/Example", b"not-macho")
+
+            result = IPAAnalyzer().analyze(ipa)
+
+        self.assertEqual(result.basic["bundle_id"], "com.example.app")
+        self.assertEqual(result.itunes_metadata, {})
+        self.assertTrue(
+            any("iTunesMetadata.plist is invalid" in error for error in result.errors)
+        )
 
     def test_rejects_missing_payload(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

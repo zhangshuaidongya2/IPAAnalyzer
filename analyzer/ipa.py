@@ -90,6 +90,7 @@ class IPAAnalyzer:
         result.raw["info_plist_xml"] = plist_xml(info)
         result.raw["info_plist_source"] = info_path.read_bytes()
         result.raw["app_candidates"] = candidates
+        self._analyze_itunes_metadata(extraction_root, result)
 
         profile_path = app_path / "embedded.mobileprovision"
         profile: dict[str, Any] = {}
@@ -151,6 +152,29 @@ class IPAAnalyzer:
         self._collect_sizes(
             ipa_path, app_path, executable, extraction_root, archive_size, result
         )
+
+    @staticmethod
+    def _analyze_itunes_metadata(
+        extraction_root: Path, result: IPAAnalysisResult
+    ) -> None:
+        metadata_path = extraction_root / "iTunesMetadata.plist"
+        result.raw["itunes_metadata"] = {}
+        if not metadata_path.is_file():
+            return
+
+        try:
+            metadata = load_plist(metadata_path)
+        except PlistError as exc:
+            result.errors.append(f"iTunesMetadata.plist is invalid: {exc}")
+            return
+
+        result.itunes_metadata = metadata
+        result.raw["itunes_metadata"] = metadata
+        try:
+            result.raw["itunes_metadata_xml"] = plist_xml(metadata)
+            result.raw["itunes_metadata_source"] = metadata_path.read_bytes()
+        except (OSError, PlistError) as exc:
+            result.errors.append(f"iTunesMetadata.plist raw data is unavailable: {exc}")
 
     @staticmethod
     def _find_main_app(extraction_root: Path) -> tuple[Path, list[dict[str, Any]]]:
