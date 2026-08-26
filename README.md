@@ -4,6 +4,13 @@
 
 IPA Analyzer is a macOS desktop application for inspecting and analyzing IPA files. All analysis is performed locally. The application only reads IPA contents and never executes bundled applications, dynamic libraries, or scripts.
 
+## Download
+
+- [**Download for Apple Silicon**](https://github.com/zhangshuaidongya2/IPAAnalyzer/releases/download/v0.1.1/IPA-Analyzer-0.1.1-macOS-arm64.dmg)
+- [**Download for Intel Mac**](https://github.com/zhangshuaidongya2/IPAAnalyzer/releases/download/v0.1.1/IPA-Analyzer-0.1.1-macOS-x86_64.dmg)
+
+**macOS 13+** | **Signed and notarized** | **Offline analysis**
+
 ## Screenshots
 
 <p align="center">
