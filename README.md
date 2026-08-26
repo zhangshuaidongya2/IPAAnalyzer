@@ -12,6 +12,58 @@ IPA Analyzer 是一款用于查看和分析 IPA 文件的 macOS 桌面工具。�
 - 浏览 IPA 完整文件结构、大小与哈希信息
 - 提供摘要与原始数据视图、搜索、复制和文件预览
 
+## 从源码运行
+
+适合希望查看源码、参与开发或使用命令行分析的用户。
+
+开发环境要求：
+
+- macOS 13 或更高版本
+- Python 3.11 或更高版本
+- macOS 系统工具：`security`、`codesign`、`file`、`lipo`、`otool`、`openssl`
+
+克隆项目并安装依赖：
+
+```bash
+git clone https://github.com/zhangshuaidongya2/IPAAnalyzer.git
+cd IPAAnalyzer
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+```
+
+启动 GUI：
+
+```bash
+python main.py --gui
+```
+
+也可以在启动时直接打开一个 IPA：
+
+```bash
+python main.py /path/to/Test.ipa --gui
+```
+
+使用命令行分析：
+
+```bash
+python main.py /path/to/Test.ipa
+```
+
+同时输出完整 JSON 报告：
+
+```bash
+python main.py /path/to/Test.ipa --json report.json
+```
+
+运行测试：
+
+```bash
+python -m unittest discover -v
+```
+
+源码运行不需要 Developer ID 证书。完成首次安装后，后续只需激活 `.venv` 即可运行。
+
 ## 下载与安装
 
 需要 macOS 13 或更高版本。请从 GitHub Releases 按 Mac 芯片下载对应安装包：
