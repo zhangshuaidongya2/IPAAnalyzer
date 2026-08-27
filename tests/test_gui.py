@@ -50,6 +50,8 @@ class GUISmokeTests(unittest.TestCase):
         self.assertEqual(window.empty_state.open_button.text(), "Choose IPA File...")
         self.assertTrue(window.statusBar().isHidden())
         self.assertFalse(window.windowIcon().isNull())
+        self.assertFalse(window.export_images_action.isEnabled())
+        self.assertFalse(window.export_images_button.isEnabled())
 
         result = IPAAnalysisResult(
             ipa_path="/tmp/example.ipa",
@@ -72,6 +74,9 @@ class GUISmokeTests(unittest.TestCase):
         self.assertIs(window.content_stack.currentWidget(), window.analysis_view)
         self.assertEqual(window.open_another_button.text(), "Open Another IPA...")
         self.assertTrue(window.open_another_button.isEnabled())
+        self.assertEqual(window.export_images_button.text(), "Extract Image Files...")
+        self.assertTrue(window.export_images_action.isEnabled())
+        self.assertTrue(window.export_images_button.isEnabled())
         self.assertFalse(window.statusBar().isHidden())
 
         metadata_page = dict(window.pages)["iTunes Metadata"]

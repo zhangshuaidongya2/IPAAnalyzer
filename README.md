@@ -6,8 +6,8 @@ IPA Analyzer is a macOS desktop application for inspecting and analyzing IPA fil
 
 ## Download
 
-- [**Download for Apple Silicon**](https://github.com/zhangshuaidongya2/IPAAnalyzer/releases/download/v0.1.1/IPA-Analyzer-0.1.1-macOS-arm64.dmg)
-- [**Download for Intel Mac**](https://github.com/zhangshuaidongya2/IPAAnalyzer/releases/download/v0.1.1/IPA-Analyzer-0.1.1-macOS-x86_64.dmg)
+- [**Download for Apple Silicon**](https://github.com/zhangshuaidongya2/IPAAnalyzer/releases/download/v0.1.2/IPA-Analyzer-0.1.2-macOS-arm64.dmg)
+- [**Download for Intel Mac**](https://github.com/zhangshuaidongya2/IPAAnalyzer/releases/download/v0.1.2/IPA-Analyzer-0.1.2-macOS-x86_64.dmg)
 
 **macOS 13+** | **Signed and notarized** | **Offline analysis**
 
@@ -30,6 +30,7 @@ IPA Analyzer is a macOS desktop application for inspecting and analyzing IPA fil
 - Inspect frameworks, extensions, Watch apps, and App Clips
 - Inspect iTunes Store metadata when `iTunesMetadata.plist` is available
 - Browse the complete IPA file tree, sizes, and hashes
+- Extract standalone image files to one folder with content-based format detection
 - Use summary and raw-data views with search, copy, and file preview support
 
 ## Running from Source
@@ -98,7 +99,8 @@ Open the downloaded DMG, drag `IPA Analyzer.app` into the Applications folder, a
 1. Launch `IPA Analyzer`.
 2. Click `Open IPA` to select a file, or drag an `.ipa` file into the window.
 3. Review key information on the summary page, then use the other pages to inspect signing, permissions, components, files, and raw data.
-4. Open or drag another IPA whenever you want to analyze a different file.
+4. Click `Extract Image Files...` to extract the IPA's standalone image files to a folder.
+5. Open or drag another IPA whenever you want to analyze a different file.
 
 You can also right-click an `.ipa` file in Finder and select `IPA Analyzer` from the Open With menu.
 

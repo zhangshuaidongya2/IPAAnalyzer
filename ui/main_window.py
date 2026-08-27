@@ -7,7 +7,17 @@ import zipfile
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QEvent, QObject, QSize, QThread, QTimer, Qt, Signal, Slot
+from PySide6.QtCore import (
+    QEvent,
+    QObject,
+    QSize,
+    QStandardPaths,
+    QThread,
+    QTimer,
+    Qt,
+    Signal,
+    Slot,
+)
 from PySide6.QtGui import QAction, QCloseEvent, QColor, QIcon, QKeySequence, QPixmap
 from PySide6.QtWidgets import (
     QFileDialog,
@@ -30,7 +40,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from analyzer import IPAAnalysisError, IPAAnalyzer
+from analyzer import (
+    IPAAnalysisError,
+    IPAAnalyzer,
+    ImageExtractionResult,
+    extract_image_resources,
+)
 from analyzer.utils import format_bytes
 from models import IPAAnalysisResult, to_json_compatible
 
@@ -95,6 +110,26 @@ class AnalysisWorker(QObject):
             self.failed.emit(str(exc))
         except Exception as exc:
             self.failed.emit(f"Unexpected analysis failure: {exc}")
+
+
+class ImageExportWorker(QObject):
+    completed = Signal(object)
+    failed = Signal(str)
+
+    def __init__(self, ipa_path: str, destination: str) -> None:
+        super().__init__()
+        self.ipa_path = ipa_path
+        self.destination = destination
+
+    @Slot()
+    def run(self) -> None:
+        try:
+            result = extract_image_resources(self.ipa_path, self.destination)
+            self.completed.emit(result)
+        except (OSError, ValueError, zipfile.BadZipFile) as exc:
+            self.failed.emit(f"Unable to extract image files: {exc}")
+        except Exception as exc:
+            self.failed.emit(f"Unexpected image extraction failure: {exc}")
 
 
 class OverviewPage(QWidget):
@@ -723,9 +758,12 @@ class MainWindow(QMainWindow):
         self.setAcceptDrops(True)
         self._thread: QThread | None = None
         self._worker: AnalysisWorker | None = None
+        self._export_thread: QThread | None = None
+        self._export_worker: ImageExportWorker | None = None
         self._closing = False
         self._pending_path: str | None = None
         self._has_result = False
+        self._current_ipa_path = ""
 
         app_icon = QIcon(str(APP_ICON_PATH))
         if not app_icon.isNull():
@@ -735,8 +773,16 @@ class MainWindow(QMainWindow):
         self.open_action.setShortcut(QKeySequence.StandardKey.Open)
         self.open_action.setToolTip("Open IPA")
         self.open_action.triggered.connect(self.open_ipa)
+        self.export_images_action = QAction("Extract Image Files...", self)
+        self.export_images_action.setToolTip(
+            "Extract standalone image files from the current IPA"
+        )
+        self.export_images_action.setEnabled(False)
+        self.export_images_action.triggered.connect(self.export_images)
         file_menu = self.menuBar().addMenu("&File")
         file_menu.addAction(self.open_action)
+        file_menu.addSeparator()
+        file_menu.addAction(self.export_images_action)
 
         self.empty_state = EmptyState()
         self.empty_state.open_requested.connect(self.open_ipa)
@@ -769,12 +815,26 @@ class MainWindow(QMainWindow):
             lambda: self.open_another_button.setEnabled(self.open_action.isEnabled())
         )
 
+        self.export_images_button = QPushButton("Extract Image Files...")
+        self.export_images_button.setMinimumHeight(34)
+        self.export_images_button.setToolTip(
+            "Extract standalone image files from the current IPA"
+        )
+        self.export_images_button.setEnabled(False)
+        self.export_images_button.clicked.connect(self.export_images_action.trigger)
+        self.export_images_action.changed.connect(
+            lambda: self.export_images_button.setEnabled(
+                self.export_images_action.isEnabled()
+            )
+        )
+
         self.sidebar = QWidget()
         self.sidebar.setFixedWidth(200)
         sidebar_layout = QVBoxLayout(self.sidebar)
         sidebar_layout.setContentsMargins(8, 8, 8, 10)
         sidebar_layout.setSpacing(8)
         sidebar_layout.addWidget(self.navigation, 1)
+        sidebar_layout.addWidget(self.export_images_button)
         sidebar_layout.addWidget(self.open_another_button)
 
         self.analysis_view = QWidget()
@@ -806,12 +866,72 @@ class MainWindow(QMainWindow):
         if path:
             self.load_ipa(path)
 
+    @Slot()
+    def export_images(self) -> None:
+        if not self._current_ipa_path:
+            return
+        if self._thread and self._thread.isRunning():
+            self.statusBar().showMessage("Wait for the current analysis to finish")
+            return
+        if self._export_thread and self._export_thread.isRunning():
+            return
+
+        initial_directory = QStandardPaths.writableLocation(
+            QStandardPaths.StandardLocation.DownloadLocation
+        ) or str(Path(self._current_ipa_path).parent)
+        parent = QFileDialog.getExistingDirectory(
+            self,
+            "Choose Where to Create the Extracted Images Folder",
+            initial_directory,
+        )
+        if not parent:
+            return
+
+        folder_name = f"{Path(self._current_ipa_path).stem} Images"
+        destination = self._available_directory(Path(parent), folder_name)
+        self.open_action.setEnabled(False)
+        self.export_images_action.setEnabled(False)
+        self.statusBar().setVisible(True)
+        self.progress.show()
+        self.statusBar().showMessage(
+            f"Extracting image files from {Path(self._current_ipa_path).name}..."
+        )
+
+        thread = QThread(self)
+        worker = ImageExportWorker(self._current_ipa_path, str(destination))
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.completed.connect(self._image_export_completed)
+        worker.failed.connect(self._image_export_failed)
+        worker.completed.connect(thread.quit)
+        worker.failed.connect(thread.quit)
+        worker.completed.connect(worker.deleteLater)
+        worker.failed.connect(worker.deleteLater)
+        thread.finished.connect(self._export_thread_finished)
+        self._export_thread = thread
+        self._export_worker = worker
+        thread.start()
+
+    @staticmethod
+    def _available_directory(parent: Path, name: str) -> Path:
+        candidate = parent / name
+        number = 2
+        while candidate.exists():
+            candidate = parent / f"{name} {number}"
+            number += 1
+        return candidate
+
     def load_ipa(self, path: str) -> None:
+        if self._export_thread and self._export_thread.isRunning():
+            self._pending_path = path
+            self.statusBar().showMessage(f"Queued {Path(path).name}")
+            return
         if self._thread and self._thread.isRunning():
             self._pending_path = path
             self.statusBar().showMessage(f"Queued {Path(path).name}")
             return
         self.open_action.setEnabled(False)
+        self.export_images_action.setEnabled(False)
         self.empty_state.set_drag_active(False)
         if not self._has_result:
             self.empty_state.set_loading(Path(path).name)
@@ -845,12 +965,16 @@ class MainWindow(QMainWindow):
         warning_text = f"; {len(result.errors)} warning(s)" if result.errors else ""
         self.setWindowTitle(f"{app_name} - IPA Analyzer")
         self._has_result = True
+        self._current_ipa_path = result.ipa_path
         self.empty_state.set_loading(None)
         self.content_stack.setCurrentWidget(self.analysis_view)
         self.statusBar().setVisible(True)
         self.statusBar().showMessage(f"Analysis complete{warning_text}")
         self.progress.hide()
         self.open_action.setEnabled(True)
+        self.export_images_action.setEnabled(
+            self._thread is None or not self._thread.isRunning()
+        )
 
     @Slot(str)
     def _analysis_failed(self, message: str) -> None:
@@ -869,6 +993,55 @@ class MainWindow(QMainWindow):
             self._thread.deleteLater()
         self._thread = None
         self._worker = None
+        self.export_images_action.setEnabled(bool(self._current_ipa_path))
+        if self._closing:
+            self.close()
+        elif self._pending_path:
+            path = self._pending_path
+            self._pending_path = None
+            QTimer.singleShot(0, lambda: self.load_ipa(path))
+
+    @Slot(object)
+    def _image_export_completed(self, result: ImageExtractionResult) -> None:
+        self.progress.hide()
+        if result.file_count == 0:
+            self.statusBar().showMessage("No standalone image files found")
+            if not self._closing:
+                QMessageBox.information(
+                    self,
+                    "Extract Image Files",
+                    "No standalone image files were found in this IPA.",
+                )
+            return
+
+        self.statusBar().showMessage(
+            f"Extracted {result.file_count} image file(s)"
+        )
+        if not self._closing:
+            QMessageBox.information(
+                self,
+                "Extract Image Files",
+                (
+                    f"Extracted {result.file_count} image file(s) "
+                    f"({format_bytes(result.total_size)}) to:\n\n{result.destination}"
+                ),
+            )
+
+    @Slot(str)
+    def _image_export_failed(self, message: str) -> None:
+        self.progress.hide()
+        self.statusBar().showMessage("Image extraction failed")
+        if not self._closing:
+            QMessageBox.critical(self, "Extract Image Files", message)
+
+    @Slot()
+    def _export_thread_finished(self) -> None:
+        if self._export_thread:
+            self._export_thread.deleteLater()
+        self._export_thread = None
+        self._export_worker = None
+        self.open_action.setEnabled(True)
+        self.export_images_action.setEnabled(bool(self._current_ipa_path))
         if self._closing:
             self.close()
         elif self._pending_path:
@@ -899,9 +1072,12 @@ class MainWindow(QMainWindow):
         event.ignore()
 
     def closeEvent(self, event: QCloseEvent) -> None:
-        if self._thread and self._thread.isRunning():
+        analysis_running = bool(self._thread and self._thread.isRunning())
+        export_running = bool(self._export_thread and self._export_thread.isRunning())
+        if analysis_running or export_running:
             self._closing = True
-            self.statusBar().showMessage("Waiting for the current analysis to finish...")
+            task = "analysis" if analysis_running else "image extraction"
+            self.statusBar().showMessage(f"Waiting for the current {task} to finish...")
             event.ignore()
             return
         event.accept()

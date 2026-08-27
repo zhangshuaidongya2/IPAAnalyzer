@@ -23,6 +23,7 @@ IPA Analyzer 是一款用于查看和分析 IPA 文件的 macOS 桌面工具。�
 - 查看 Framework、Extension、Watch App 和 App Clip
 - 当 IPA 包含 `iTunesMetadata.plist` 时查看 iTunes 商店元数据
 - 浏览 IPA 完整文件结构、大小与哈希信息
+- 按文件内容识别格式，将独立图片文件提取到同一文件夹
 - 提供摘要与原始数据视图、搜索、复制和文件预览
 
 ## 从源码运行
@@ -91,7 +92,8 @@ python -m unittest discover -v
 1. 启动 `IPA Analyzer`。
 2. 点击 `Open IPA` 选择文件，或直接把 `.ipa` 文件拖入窗口。
 3. 在摘要页面查看主要信息，在其他页面查看签名、权限、组件、文件和原始数据。
-4. 需要分析其他文件时，重新打开或拖入新的 IPA 即可。
+4. 点击 `Extract Image Files...`，将 IPA 中的独立图片文件提取到文件夹。
+5. 需要分析其他文件时，重新打开或拖入新的 IPA 即可。
 
 也可以在 Finder 中右键 `.ipa` 文件，选择“打开方式”中的 `IPA Analyzer`。
 
