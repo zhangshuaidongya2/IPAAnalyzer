@@ -29,12 +29,12 @@ case "${PYINSTALLER_TARGET_ARCH}" in
 esac
 
 DIST_ROOT="${IPA_ANALYZER_DIST_ROOT:-${PROJECT_ROOT}/dist/${PYINSTALLER_TARGET_ARCH}}"
-WORK_ROOT="${PROJECT_ROOT}/build/pyinstaller/${PYINSTALLER_TARGET_ARCH}"
+WORK_ROOT="${IPA_ANALYZER_WORK_ROOT:-${PROJECT_ROOT}/build/pyinstaller/${PYINSTALLER_TARGET_ARCH}}"
 
 cd "${PROJECT_ROOT}"
 export PYINSTALLER_STRICT_BUNDLE_CODESIGN_ERROR=1
 export PYINSTALLER_VERIFY_BUNDLE_SIGNATURE=1
-"${VENV_PATH}/bin/pyinstaller" \
+"${PYTHON_BIN}" -m PyInstaller \
   --noconfirm \
   --clean \
   --distpath "${DIST_ROOT}" \
@@ -42,6 +42,9 @@ export PYINSTALLER_VERIFY_BUNDLE_SIGNATURE=1
   "${PROJECT_ROOT}/IPAAnalyzer.spec"
 
 APP_PATH="${DIST_ROOT}/IPA Analyzer.app"
+if [[ "${IPA_ANALYZER_JCTOOLS:-0}" == "1" ]]; then
+  APP_PATH="${DIST_ROOT}/IPAInspector.app"
+fi
 APP_EXECUTABLE="${APP_PATH}/Contents/MacOS/IPA Analyzer"
 ACTUAL_ARCHS="$(lipo -archs "${APP_EXECUTABLE}")"
 if [[ "${PYINSTALLER_TARGET_ARCH}" == "universal2" ]]; then

@@ -78,6 +78,22 @@ python -m unittest discover -v
 
 源码运行不需要 Developer ID 证书。完成首次安装后，后续只需激活 `.venv` 即可运行。
 
+## JCTools 工具箱集成
+
+此工程可与 `jctools` 并列放置，双方保留各自的 Git 仓库。构建 JCTools 时会将完整
+分析器及 Python/Qt 运行环境打包到其 `Contents/Helpers/IPAInspector.app`，从工具箱的
+“IPA 分析”入口打开独立窗口。独立运行本工程的 GUI 和 CLI 仍使用原来的方式。
+
+本地调试工具箱模式：
+
+```bash
+.venv/bin/python gui_main.py --jctools --downloads-directory "$HOME/Downloads/jctoolsDownloads"
+```
+
+集成模式仅定制窗口标题和文件选择/导出的默认目录，保留全部分析与图片提取功能。
+打包的最低 macOS 版本会根据 Python/Qt 二进制自动计算；较新的 PySide6 可能要求
+高于 macOS 13 的系统，当前 PySide6 6.11 要求 macOS 15。
+
 ## 下载与安装
 
 需要 macOS 13 或更高版本。请从 GitHub Releases 按 Mac 芯片下载对应安装包：

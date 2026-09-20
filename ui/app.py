@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 from PySide6.QtCore import QCoreApplication, QEvent, QTimer, Signal
 from PySide6.QtGui import QFileOpenEvent
@@ -26,12 +27,18 @@ class IPAApplication(QApplication):
         return super().event(event)
 
 
-def run_gui(initial_path: str | None = None, *, quit_after_ms: int | None = None) -> int:
+def run_gui(
+    initial_path: str | None = None,
+    *,
+    title: str = "IPA Analyzer",
+    files_directory: Path | None = None,
+    quit_after_ms: int | None = None,
+) -> int:
     QCoreApplication.setApplicationName("IPA Analyzer")
     QCoreApplication.setOrganizationName("IPA Analyzer")
     QCoreApplication.setOrganizationDomain("ipaanalyzer.app")
     app = QApplication.instance() or IPAApplication([sys.argv[0]])
-    window = MainWindow(initial_path)
+    window = MainWindow(initial_path, title=title, files_directory=files_directory)
 
     def open_from_finder(path: str) -> None:
         window.load_ipa(path)

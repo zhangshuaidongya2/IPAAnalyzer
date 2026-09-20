@@ -750,9 +750,17 @@ class EmptyState(QWidget):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, initial_path: str | None = None) -> None:
+    def __init__(
+        self,
+        initial_path: str | None = None,
+        *,
+        title: str = "IPA Analyzer",
+        files_directory: Path | None = None,
+    ) -> None:
         super().__init__()
-        self.setWindowTitle("IPA Analyzer")
+        self._application_title = title
+        self._files_directory = files_directory.expanduser() if files_directory else None
+        self.setWindowTitle(title)
         self.resize(1180, 760)
         self.setMinimumSize(880, 600)
         self.setAcceptDrops(True)
@@ -862,7 +870,8 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def open_ipa(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "Open IPA", "", "IPA files (*.ipa)")
+        initial_directory = str(self._files_directory) if self._files_directory else ""
+        path, _ = QFileDialog.getOpenFileName(self, "Open IPA", initial_directory, "IPA files (*.ipa)")
         if path:
             self.load_ipa(path)
 
@@ -876,7 +885,7 @@ class MainWindow(QMainWindow):
         if self._export_thread and self._export_thread.isRunning():
             return
 
-        initial_directory = QStandardPaths.writableLocation(
+        initial_directory = str(self._files_directory) if self._files_directory else QStandardPaths.writableLocation(
             QStandardPaths.StandardLocation.DownloadLocation
         ) or str(Path(self._current_ipa_path).parent)
         parent = QFileDialog.getExistingDirectory(
@@ -963,7 +972,7 @@ class MainWindow(QMainWindow):
                 setter(result)
         app_name = result.basic.get("display_name") or result.basic.get("name") or Path(result.ipa_path).name
         warning_text = f"; {len(result.errors)} warning(s)" if result.errors else ""
-        self.setWindowTitle(f"{app_name} - IPA Analyzer")
+        self.setWindowTitle(f"{app_name} - {self._application_title}")
         self._has_result = True
         self._current_ipa_path = result.ipa_path
         self.empty_state.set_loading(None)

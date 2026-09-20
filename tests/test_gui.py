@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -42,6 +44,27 @@ class GUISmokeTests(unittest.TestCase):
 
         empty_state.set_drag_active(True)
         self.assertTrue(empty_state.property("dragActive"))
+
+    def test_jctools_title_and_file_dialog_defaults(self) -> None:
+        directory = Path("/tmp/下载目录 with spaces/jctoolsDownloads")
+        window = self.window_class(title="IPA 分析 — JCTools", files_directory=directory)
+        self.assertEqual(window.windowTitle(), "IPA 分析 — JCTools")
+        with patch("ui.main_window.QFileDialog.getOpenFileName", return_value=("", "")) as choose:
+            window.open_ipa()
+            self.assertEqual(choose.call_args.args[2], str(directory))
+
+        result = IPAAnalysisResult(
+            ipa_path="/tmp/Example.ipa", basic={"display_name": "Example"},
+            signing={"code_signature": {}}, entitlements={"effective": {}},
+        )
+        window._analysis_completed(result)
+        self.assertEqual(window.windowTitle(), "Example - IPA 分析 — JCTools")
+        self.assertEqual(window.navigation.count(), 11)
+        with patch("ui.main_window.QFileDialog.getExistingDirectory", return_value="") as choose:
+            window.export_images()
+            self.assertEqual(choose.call_args.args[2], str(directory))
+        self.assertTrue(window.export_images_action.isEnabled())
+        window.close()
 
     def test_window_accepts_analysis_result(self) -> None:
         window = self.window_class()
