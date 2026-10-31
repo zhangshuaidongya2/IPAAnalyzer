@@ -46,16 +46,20 @@ source .venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
-启动 GUI：
+在项目目录中独立调试运行 GUI，日志会直接输出到终端：
 
 ```bash
-python main.py --gui
+./run_debug.sh
 ```
+
+脚本直接运行当前源码，不需要打包或激活虚拟环境；首次运行时会自动创建 `.venv`
+并安装 GUI 依赖（需要 Python 3.11+ 和网络）。之后修改源码，退出窗口并重新运行
+即可生效。也可以使用 `make gui`，或通过 `./run_debug.sh --help` 查看参数。
 
 也可以在启动时直接打开一个 IPA：
 
 ```bash
-python main.py /path/to/Test.ipa --gui
+./run_debug.sh "/path/to/Test App.ipa"
 ```
 
 使用命令行分析：
@@ -76,18 +80,27 @@ python main.py /path/to/Test.ipa --json report.json
 python -m unittest discover -v
 ```
 
-源码运行不需要 Developer ID 证书。完成首次安装后，后续只需激活 `.venv` 即可运行。
+源码运行不需要 Developer ID 证书。上面的 `python main.py` 命令行方式需要激活
+`.venv`；`run_debug.sh` 会自动使用项目的虚拟环境。
 
 ## JCTools 工具箱集成
 
 此工程可与 `jctools` 并列放置，双方保留各自的 Git 仓库。构建 JCTools 时会将完整
 分析器及 Python/Qt 运行环境打包到其 `Contents/Helpers/IPAInspector.app`，从工具箱的
-“IPA 分析”入口打开独立窗口。独立运行本工程的 GUI 和 CLI 仍使用原来的方式。
+“IPA 分析”入口打开独立窗口。
+
+在 `jctools` 目录通过 `./run_debug.sh` 启动调试时，“IPA 分析”会直接调用本工程的
+`run_debug.sh`，加载当前源码，日志输出到同一终端。修改 Python 代码后，关闭分析
+窗口再打开即可生效。首次使用或修改 JCTools 主程序时，运行
+`./run_debug.sh --build`；此调试构建会跳过分析器打包。
+
+正常构建 JCTools（`./build.sh` 或发布脚本）仍将分析器及 Python/Qt 环境打包到 App，
+正常启动使用内置副本，不依赖本机源码。因此发布包中的分析器在重新打包后更新。
 
 本地调试工具箱模式：
 
 ```bash
-.venv/bin/python gui_main.py --jctools --downloads-directory "$HOME/Downloads/jctoolsDownloads"
+./run_debug.sh --jctools --downloads-directory "$HOME/Downloads/jctoolsDownloads"
 ```
 
 集成模式仅定制窗口标题和文件选择/导出的默认目录，保留全部分析与图片提取功能。

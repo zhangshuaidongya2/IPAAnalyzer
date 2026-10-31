@@ -10,6 +10,7 @@ from typing import Any
 from PySide6.QtCore import (
     QEvent,
     QObject,
+    QSignalBlocker,
     QSize,
     QStandardPaths,
     QThread,
@@ -382,9 +383,15 @@ class FrameworksPage(QWidget):
     def __init__(self) -> None:
         super().__init__()
         self.items: list[dict[str, Any]] = []
+        self._default_items: list[dict[str, Any]] = []
+        self._size_sort_order: Qt.SortOrder | None = None
         self.table = CopyableTable(
             ["Name", "Version", "Architecture", "Size", "Signed", "SHA256"]
         )
+        header = self.table.horizontalHeader()
+        header.setSectionsClickable(True)
+        header.setSortIndicatorShown(False)
+        header.sectionClicked.connect(self._sort_by_size)
         self.details = SearchableText()
         splitter = QSplitter(Qt.Orientation.Vertical)
         splitter.addWidget(self.table)
@@ -395,25 +402,57 @@ class FrameworksPage(QWidget):
         self.table.itemSelectionChanged.connect(self._show_selection)
 
     def set_result(self, result: IPAAnalysisResult) -> None:
-        self.items = result.frameworks
-        self.table.setRowCount(len(self.items))
-        for row, framework in enumerate(self.items):
-            values = (
-                framework.get("name"),
-                framework.get("version"),
-                ", ".join(framework.get("architectures", [])),
-                format_bytes(framework.get("size")),
-                "Yes" if framework.get("signed") else "No",
-                framework.get("sha256"),
-            )
-            for column, value in enumerate(values):
-                self.table.setItem(row, column, QTableWidgetItem(_display(value)))
+        self._default_items = list(result.frameworks)
+        self.items = list(self._default_items)
+        self._size_sort_order = None
+        self.table.horizontalHeader().setSortIndicatorShown(False)
+        self._fill_table()
+
+    def _fill_table(self) -> None:
+        with QSignalBlocker(self.table):
+            self.table.setRowCount(0)
+            self.table.setRowCount(len(self.items))
+            for row, framework in enumerate(self.items):
+                values = (
+                    framework.get("name"),
+                    framework.get("version"),
+                    ", ".join(framework.get("architectures", [])),
+                    format_bytes(framework.get("size")),
+                    "Yes" if framework.get("signed") else "No",
+                    framework.get("sha256"),
+                )
+                for column, value in enumerate(values):
+                    self.table.setItem(row, column, QTableWidgetItem(_display(value)))
         self.details.set_text("")
+
+    def _sort_by_size(self, column: int) -> None:
+        if column == 3:
+            if self._size_sort_order is None:
+                self._size_sort_order = Qt.SortOrder.DescendingOrder
+            elif self._size_sort_order == Qt.SortOrder.DescendingOrder:
+                self._size_sort_order = Qt.SortOrder.AscendingOrder
+            else:
+                self._size_sort_order = None
+
+            self.items = list(self._default_items)
+            if self._size_sort_order is not None:
+                self.items.sort(
+                    key=lambda item: item.get("size") or 0,
+                    reverse=self._size_sort_order == Qt.SortOrder.DescendingOrder,
+                )
+            self._fill_table()
+
+        header = self.table.horizontalHeader()
+        header.setSortIndicatorShown(self._size_sort_order is not None)
+        if self._size_sort_order is not None:
+            header.setSortIndicator(3, self._size_sort_order)
 
     def _show_selection(self) -> None:
         row = self.table.currentRow()
         if 0 <= row < len(self.items):
             self.details.set_json(self.items[row])
+        else:
+            self.details.set_text("")
 
 
 class ExtensionsPage(QWidget):
@@ -510,8 +549,7 @@ class FilesPage(QWidget):
                     self.tree.addTopLevelItem(node)
                 nodes[partial] = node
             node = nodes[relative]
-            if not entry.get("is_directory"):
-                node.setText(1, format_bytes(int(entry.get("size", 0))))
+            node.setText(1, format_bytes(int(entry.get("size", 0))))
         self.tree.expandToDepth(1)
         self.details.set_text("")
 

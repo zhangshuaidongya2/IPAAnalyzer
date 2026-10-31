@@ -7,7 +7,7 @@ release:
 	./package_release_dmg.sh
 
 gui:
-	./.venv/bin/python main.py --gui
+	./run_debug.sh
 
 test:
 	./.venv/bin/python -m unittest discover -v

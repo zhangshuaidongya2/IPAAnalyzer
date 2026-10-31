@@ -5,7 +5,40 @@ import unittest
 import zipfile
 from pathlib import Path
 
-from analyzer.files import ArchiveSecurityError, extract_image_resources
+from analyzer.files import ArchiveSecurityError, build_file_index, extract_image_resources
+
+
+class FileIndexTests(unittest.TestCase):
+    def test_directory_sizes_include_all_descendants_once(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "App.app" / "资源" / "Nested").mkdir(parents=True)
+            (root / "App.app" / "Empty").mkdir()
+            (root / "Other").mkdir()
+            files = {
+                "App.app/main": b"a" * 1024,
+                "App.app/资源/icon": b"b" * 2048,
+                "App.app/资源/Nested/data": b"c" * 512,
+                "Other/data": b"d" * 7,
+                "metadata": b"e" * 3,
+            }
+            for relative, data in files.items():
+                (root / relative).write_bytes(data)
+
+            entries = {str(entry["relative_path"]): entry for entry in build_file_index(root)}
+
+        expected_sizes = {
+            "App.app": 3584,
+            "App.app/资源": 2560,
+            "App.app/资源/Nested": 512,
+            "App.app/Empty": 0,
+            "Other": 7,
+            **{relative: len(data) for relative, data in files.items()},
+        }
+        self.assertEqual(
+            {relative: entry["size"] for relative, entry in entries.items()},
+            expected_sizes,
+        )
 
 
 class ImageExtractionTests(unittest.TestCase):

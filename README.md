@@ -53,16 +53,21 @@ source .venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
-Launch the GUI:
+Run the GUI independently with logs in the terminal:
 
 ```bash
-python main.py --gui
+./run_debug.sh
 ```
+
+The launcher runs the current source directly, without packaging or activating the virtual
+environment. On first use it creates `.venv` and installs GUI dependencies, requiring
+Python 3.11+ and network access. After changing the source, close the window and run the
+launcher again. `make gui` uses the same launcher; `./run_debug.sh --help` lists its options.
 
 You can also open an IPA when launching the GUI:
 
 ```bash
-python main.py /path/to/Test.ipa --gui
+./run_debug.sh "/path/to/Test App.ipa"
 ```
 
 Analyze an IPA from the command line:
@@ -83,7 +88,17 @@ Run the tests:
 python -m unittest discover -v
 ```
 
-Running from source does not require a Developer ID certificate. After the initial setup, activate `.venv` whenever you want to run the project again.
+Running from source does not require a Developer ID certificate. Activate `.venv` for the
+`python main.py` commands above; `run_debug.sh` selects the project's environment automatically.
+
+When JCTools is started with its `run_debug.sh`, the IPA analysis tool runs this project's
+current source and writes logs to the same terminal. Close and reopen the analyzer to load
+Python changes. Use `./run_debug.sh --build` in the JCTools directory for its initial build
+or native code changes; this debug build skips packaging the analyzer.
+
+Normal JCTools builds (`./build.sh` or the release scripts) still bundle the analyzer and its
+Python/Qt runtime. Normal app launches use that bundled copy without requiring source files;
+updates to the packaged analyzer take effect when the app is rebuilt.
 
 ## Download and Installation
 

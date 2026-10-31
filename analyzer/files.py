@@ -292,4 +292,12 @@ def build_file_index(root: Path, ipa_path: Path | None = None) -> list[dict[str,
         if not is_directory:
             entry["sha256"] = hash_file(path)["sha256"]
         entries.append(entry)
+
+    entries_by_path = {str(entry["relative_path"]): entry for entry in entries}
+    # Sorted paths place parents first; accumulate children before their parents.
+    for entry in reversed(entries):
+        parent_path = str(entry["relative_path"]).rpartition("/")[0]
+        if parent_path in entries_by_path:
+            parent = entries_by_path[parent_path]
+            parent["size"] = int(parent["size"]) + int(entry["size"])
     return entries
